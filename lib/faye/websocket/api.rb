@@ -22,6 +22,7 @@ module Faye
         super()
         ::WebSocket::Driver.validate_options(options, [:headers, :extensions, :max_length, :ping, :proxy, :tls])
 
+        @proxy ||= nil
         @driver = yield
 
         if headers = options[:headers]
@@ -32,8 +33,8 @@ module Faye
           @driver.add_extension(extension)
         end
 
-        @ping            = options[:ping]
-        @ping_id         = 0
+        #@ping            = options[:ping]
+        #@ping_id         = 0
         @buffered_amount = 0
 
         @driver.on(:open)    { |e| open }
@@ -44,12 +45,12 @@ module Faye
           emit_error(error.message)
         end
 
-        if @ping
-          @ping_timer = EventMachine.add_periodic_timer(@ping) do
-            @ping_id += 1
-            ping(@ping_id.to_s)
-          end
-        end
+        #if @ping
+        #  @ping_timer = EventMachine.add_periodic_timer(@ping) do
+        #    @ping_id += 1
+        #    ping(@ping_id.to_s)
+        #  end
+        #end
       end
 
       def write(data)
@@ -120,7 +121,7 @@ module Faye
         @close_params = [reason, code]
 
         if @stream
-          @stream.close_connection_after_writing
+          @stream.close
         else
           finalize_close
         end
@@ -130,7 +131,7 @@ module Faye
         return if @ready_state == CLOSED
         @ready_state = CLOSED
 
-        EventMachine.cancel_timer(@ping_timer) if @ping_timer
+        #EventMachine.cancel_timer(@ping_timer) if @ping_timer
 
         reason = @close_params ? @close_params[0] : ''
         code   = @close_params ? @close_params[1] : 1006

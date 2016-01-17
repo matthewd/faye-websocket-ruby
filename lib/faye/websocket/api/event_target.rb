@@ -6,7 +6,7 @@ module Faye::WebSocket::API
 
     events.each do |event_type|
       define_method "on#{event_type}=" do |handler|
-        EventMachine.next_tick do
+        @supervisor.defer do
           flush(event_type, handler)
           instance_variable_set("@on#{event_type}", handler)
         end
@@ -19,7 +19,7 @@ module Faye::WebSocket::API
 
     def add_listener(event_type, callable = nil, &block)
       listener = callable || block
-      EventMachine.next_tick do
+      @supervisor.defer do
         flush(event_type, listener)
         super(event_type, &listener)
       end

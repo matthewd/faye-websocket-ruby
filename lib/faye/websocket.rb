@@ -7,7 +7,7 @@
 require 'forwardable'
 require 'stringio'
 require 'uri'
-require 'eventmachine'
+require 'concurrent'
 require 'websocket/driver'
 
 module Faye
@@ -20,6 +20,7 @@ module Faye
     autoload :Adapter, root + '/adapter'
     autoload :API,     root + '/api'
     autoload :Client,  root + '/client'
+    autoload :Supervisor, root + '/supervisor'
 
     ADAPTERS = {
       'goliath'  => :Goliath,
@@ -30,11 +31,6 @@ module Faye
     def self.determine_url(env)
       scheme = secure_request?(env) ? 'wss:' : 'ws:'
       "#{ scheme }//#{ env['HTTP_HOST'] }#{ env['REQUEST_URI'] }"
-    end
-
-    def self.ensure_reactor_running
-      Thread.new { EventMachine.run } unless EventMachine.reactor_running?
-      Thread.pass until EventMachine.reactor_running?
     end
 
     def self.load_adapter(backend)
@@ -61,15 +57,19 @@ module Faye
     attr_reader :env
     include API
 
+    def self.default_supervisor
+      @default_supervisor ||= Supervisor.new
+    end
+
     def initialize(env, protocols = nil, options = {})
-      WebSocket.ensure_reactor_running
+      @supervisor = options.delete(:supervisor) || self.class.default_supervisor
 
       @env = env
       @url = WebSocket.determine_url(@env)
 
       super(options) { ::WebSocket::Driver.rack(self, :max_length => options[:max_length], :protocols => protocols) }
 
-      @stream = Stream.new(self)
+      @stream = Stream.new(@supervisor, self)
 
       if callback = @env['async.callback']
         callback.call([101, {}, @stream])
@@ -79,7 +79,7 @@ module Faye
     def start_driver
       return if @driver.nil? || @driver_started
       @driver_started = true
-      EventMachine.schedule { @driver.start }
+      @supervisor.defer { @driver.start }
     end
 
     def rack_response

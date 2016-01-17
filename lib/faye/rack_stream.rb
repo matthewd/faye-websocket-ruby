@@ -1,28 +1,13 @@
 module Faye
   class RackStream
 
-    include EventMachine::Deferrable
-
-    module Reader
-      attr_accessor :stream
-
-      def receive_data(data)
-        stream.receive(data)
-      end
-
-      def unbind
-        stream.fail
-      end
-    end
-
-    def initialize(socket)
+    def initialize(supervisor, socket)
+      @supervisor    = supervisor
       @socket_object = socket
-      @connection    = socket.env['em.connection']
       @stream_send   = socket.env['stream.send']
 
       hijack_rack_socket
 
-      @connection.socket_stream = self if @connection.respond_to?(:socket_stream)
     end
 
     def hijack_rack_socket
@@ -30,40 +15,18 @@ module Faye
 
       @socket_object.env['rack.hijack'].call
       @rack_hijack_io = @socket_object.env['rack.hijack_io']
-      queue = Queue.new
 
-      EventMachine.schedule do
-        begin
-          EventMachine.attach(@rack_hijack_io, Reader) do |reader|
-            reader.stream = self
-            if @rack_hijack_io
-              @rack_hijack_io_reader = reader
-            else
-              reader.close_connection_after_writing
-            end
-          end
-        ensure
-          queue.push(nil)
-        end
-      end
-
-      queue.pop if EventMachine.reactor_running?
+      @supervisor.attach(@rack_hijack_io, self)
     end
 
     def clean_rack_hijack
       return unless @rack_hijack_io
-      @rack_hijack_io_reader.close_connection_after_writing
-      @rack_hijack_io = @rack_hijack_io_reader = nil
+      @supervisor.detach(@rack_hijack_io, self)
+      @rack_hijack_io = nil
     end
 
-    def close_connection
+    def close
       clean_rack_hijack
-      @connection.close_connection if @connection
-    end
-
-    def close_connection_after_writing
-      clean_rack_hijack
-      @connection.close_connection_after_writing if @connection
     end
 
     def each(&callback)

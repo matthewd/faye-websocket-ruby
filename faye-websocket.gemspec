@@ -15,7 +15,8 @@ Gem::Specification.new do |s|
             Dir.glob('lib/**/*.rb') +
             Dir.glob('examples/**/*')
 
-  s.add_dependency 'eventmachine', '>= 0.12.0'
+  s.add_dependency 'concurrent-ruby', '~> 1.0'
+  s.add_dependency 'nio4r', '~> 1.2'
   s.add_dependency 'websocket-driver', '>= 0.5.1'
 
   s.add_development_dependency 'permessage_deflate'
