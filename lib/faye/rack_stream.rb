@@ -6,6 +6,8 @@ module Faye
       @socket_object = socket
       @stream_send   = socket.env['stream.send']
 
+      @rack_hijack_io = nil
+
       hijack_rack_socket
 
     end

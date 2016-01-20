@@ -48,7 +48,7 @@ module Faye::WebSocket::API
   private
 
     def flush(event_type, listener)
-      if buffer = @buffers && @buffers.delete(event_type.to_s)
+      if buffer = defined?(@buffers) && @buffers && @buffers.delete(event_type.to_s)
         buffer.each { |event| listener.call(event) }
       end
     end
